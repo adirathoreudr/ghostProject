@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts loaded via HTML ── */
+
+:root {
+  --ghost-black:   #080810;
+  --ghost-deep:    #0d0d1a;
+  --ghost-surface: #12121f;
+  --ghost-card:    #16162a;
+  --ghost-border:  #1e1e35;
+  --ghost-accent:  #e94560;
+  --ghost-gold:    #f4a623;
+  --ghost-cyan:    #00d4ff;
+  --ghost-green:   #00ff88;
+  --ghost-text:    #e8e8f0;
+  --ghost-sub:     #8888aa;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  background: var(--ghost-black);
+  color: var(--ghost-text);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--ghost-deep); }
+::-webkit-scrollbar-thumb { background: var(--ghost-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ghost-muted); }
+
+/* Noise texture overlay — creates film grain effect */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px;
+}
+
+/* Radial glow at top center — ambient light effect */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(233, 69, 96, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* All content above overlays */
+#root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ghost display font utility */
+.font-display { font-family: 'Syne', sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', monospace; }
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #e94560 0%, #f4a623 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-cyan {
+  background: linear-gradient(135deg, #00d4ff 0%, #00ff88 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card glass effect */
+.glass {
+  background: rgba(22, 22, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 30, 53, 0.8);
+}
+
+/* Accent glow button */
+.btn-ghost {
+  background: linear-gradient(135deg, #e94560, #c73550);
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 0 rgba(233,69,96,0);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(233,69,96,0.4), 0 4px 20px rgba(233,69,96,0.3);
+  transform: translateY(-1px);
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 0 15px rgba(233,69,96,0.3);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Recording pulse ring */
+@keyframes recPulse {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  50%  { transform: scale(1.15); opacity: 0.3; }
+  100% { transform: scale(1);   opacity: 0.8; }
+}
+
+.rec-pulse {
+  animation: recPulse 1.4s ease-in-out infinite;
+}
+
+/* Waveform bars */
+@keyframes waveBar {
+  0%, 100% { transform: scaleY(0.2); }
+  50%       { transform: scaleY(1); }
+}
+
+.wave-bar {
+  animation: waveBar 0.8s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+/* Slide up entrance */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-100 { animation-delay: 0.1s; opacity: 0; }
+.delay-200 { animation-delay: 0.2s; opacity: 0; }
+.delay-300 { animation-delay: 0.3s; opacity: 0; }
+.delay-400 { animation-delay: 0.4s; opacity: 0; }
+.delay-500 { animation-delay: 0.5s; opacity: 0; }
