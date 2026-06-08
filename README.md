@@ -251,7 +251,7 @@ ghost/
 
 **ElevenLabs Worldwide Hackathon #9**
 
-Built solo in 48 hours. Every line of code written from scratch.
+Built solo in 48 hours for the ElevenLabs Hack!
 
 ---
 
