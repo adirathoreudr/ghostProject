@@ -1,9 +1,9 @@
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
 let _client = null;
 
 function getClient() {
-  if (!_client) {
+  }
     if (!process.env.ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not set');
     _client = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
   }
@@ -15,7 +15,7 @@ function getClient() {
  *
  * SDK param names (camelCase, not snake_case):
  *   file       — the audio File object
- *   modelId    — 'scribe_v1'
+ * Response shape: { text, language_code, language_probability, words, ... }
  *   languageCode — 'en'
  *
  * Response shape: { text, language_code, language_probability, words, ... }
@@ -28,7 +28,7 @@ export async function transcribeAudio(audioBuffer, mimeType = 'audio/webm') {
 
   const audioFile = new File(
     [audioBuffer],
-    `audio.${getExtension(mimeType)}`,
+  // Note: SDK uses camelCase params internally, serializes to snake_case for the API
     { type: normalizeType(mimeType) }
   );
 
