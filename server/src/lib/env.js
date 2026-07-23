@@ -1,7 +1,3 @@
-/**
- * Environment variable validation module.
- * Checks for required and optional variables at startup.
- */
 const REQUIRED = [
   'ELEVENLABS_API_KEY',
   'NVIDIA_API_KEY',
@@ -9,11 +5,6 @@ const REQUIRED = [
 
 const OPTIONAL = [
   'POSTHOG_API_KEY',
-/**
- * Validates that required environment variables are set.
- * Logs warnings for missing required and optional variables.
- * @returns {void}
- */
   'NGROK_URL',
 ];
 

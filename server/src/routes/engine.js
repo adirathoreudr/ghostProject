@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'; // eslint-disable-line import/no-unresolved
+import { Router } from 'express';
 import fetch from 'node-fetch';
 
 export const engineRouter = Router();
@@ -6,7 +6,7 @@ export const engineRouter = Router();
 /**
  * POST /api/engine/create
  * Creates an ElevenLabs Speech Engine instance.
- * @returns {Promise<void>}
+ * Must be called AFTER ngrok is running so wss_url is available.
  * Returns engine_id which should be stored on the client.
  */
 engineRouter.post('/create', async (req, res) => {
@@ -60,7 +60,7 @@ engineRouter.post('/create', async (req, res) => {
 
   } catch (err) {
     console.error('[Engine] Unexpected error:', err);
- * @returns {void}
+    res.status(500).json({ error: err.message, code: 'SERVER_ERROR' });
   }
 });
 

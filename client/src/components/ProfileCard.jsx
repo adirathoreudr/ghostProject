@@ -1,11 +1,7 @@
-import { api } from '../lib/api.js';
 import React, { useState } from 'react';
 import { Mic, Trash2, Play, Check } from 'lucide-react';
 import { PERSONAS_MAP } from '../stores/profileStore.js';
 import { api } from '../lib/api.js';
-  /**
-   * Flag to track if the voice has been played.
-   */
 
 export function ProfileCard({ profile, isActive, onActivate, onDelete }) {
   const persona = PERSONAS_MAP[profile.persona] || PERSONAS_MAP.hormozi;
@@ -45,7 +41,6 @@ export function ProfileCard({ profile, isActive, onActivate, onDelete }) {
           ? 'border-ghost-accent bg-ghost-card'
           : 'border-ghost-border bg-ghost-surface hover:border-ghost-muted'
         }
-      // Delete the voice clone from ElevenLabs API
       `}
       onClick={onActivate}
       style={isActive ? { boxShadow: '0 0 30px rgba(233,69,96,0.15)' } : {}}
