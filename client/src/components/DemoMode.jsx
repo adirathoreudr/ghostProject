@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Circle, Loader2, X, ChevronRight, Zap } from 'lucide-react';
 import { useProfileStore } from '../stores/profileStore.js';
