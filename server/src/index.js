@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'; // Load environment variables from .env file
 import express from 'express';
 import cors from 'cors';
 import { voiceRouter } from './routes/voice.js';
@@ -10,7 +10,7 @@ import { validateEnv } from './lib/env.js';
 
 validateEnv();
 
-const app = express();
+const app = express(); // Initialize Express application
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
@@ -18,7 +18,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
 
 app.use('/api/health',  healthRouter);
 app.use('/api/voice',   voiceRouter);
