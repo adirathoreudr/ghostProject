@@ -1,4 +1,4 @@
-import 'dotenv/config'; // Load environment variables from .env file
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { voiceRouter } from './routes/voice.js';
