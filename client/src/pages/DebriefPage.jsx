@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, RotateCcw, Zap, Clock, TrendingUp } from 'lucide-react';
 import { GhostLogo } from '../components/GhostLogo.jsx';
