@@ -69,7 +69,7 @@ Web Audio API (mic capture)
     ▼
 POST /api/ghost/takeover
     │
-    ├─► ElevenLabs STT (scribe_v1)
+    ├─► ElevenLabs STT (scribe_v2)
     │       └─► transcript string
     │
     ├─► NVIDIA NIM Llama 3.3 70B
@@ -89,7 +89,7 @@ POST /api/ghost/takeover
 |---|---|
 | Frontend | React 18 + Vite + Tailwind CSS + Zustand |
 | Backend | Node.js + Express |
-| STT | ElevenLabs Scribe v1 |
+| STT | ElevenLabs Scribe v2 |
 | Voice Clone | ElevenLabs Instant Voice Clone |
 | TTS | ElevenLabs Turbo v2.5 (streaming) |
 | LLM | NVIDIA NIM — Llama 3.3 70B Instruct |
@@ -121,10 +121,8 @@ POST /api/ghost/takeover
 **5 Objection Types**
 - Stall · Price · Authority · Timing · Competitor
 
-**Phase 5 Hardening**
-- Pre-warm cache: all 5 objection types pre-generated at session start
-- Client-side audio blob cache for instant playback
-- Demo run-through checker with 6-step verification
+**Hardening**
+- Demo run-through checker with 5-step verification
 - Graceful fallbacks at every external API boundary
 
 **Post-Call Debrief**
@@ -139,7 +137,7 @@ POST /api/ghost/takeover
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - ElevenLabs API key — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys)
 - NVIDIA NIM API key — [build.nvidia.com](https://build.nvidia.com) → any model → Get API Key
 - BlackHole 2ch (M1/M2 Mac) — `brew install blackhole-2ch`
@@ -149,15 +147,13 @@ POST /api/ghost/takeover
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/ghost-sales-copilot
-cd ghost-sales-copilot
+git clone https://github.com/adirathoreudr/ghostProject
+cd ghostProject
 
-# Install all dependencies
-npm install
-cd client && npm install && cd ..
-cd server && npm install && cd ..
+# Install all dependencies (root, client and server)
+npm run install:all
 
-# Set up environment
+# Set up environment (.env lives in the repo root)
 cp .env.example .env
 ```
 
@@ -191,7 +187,7 @@ Open `http://localhost:5173`
 
 ```
 1. Open Ghost → create a voice profile (30s recording)
-2. Click "Demo Check" → verify all 6 systems pass
+2. Click "Demo Check" → verify all 5 checks pass
 3. Click "Launch Ghost" → you land on the live call page
 4. Join your call in another tab
 5. When prospect says an objection → hold SPACE
@@ -208,17 +204,20 @@ Open `http://localhost:5173`
 ```
 ghost/
 ├── client/                  # React frontend
-│   └── src/
-│       ├── components/      # GhostOverlay, LiveCaptions, DemoMode, AudioDeviceSelector
-│       ├── hooks/           # useGhostTakeover, useAudioRecorder
-│       ├── pages/           # Dashboard, Onboarding, Call, Debrief
-│       ├── stores/          # ghostStore, profileStore (Zustand)
-│       └── lib/             # api.js
+│   ├── src/
+│   │   ├── components/      # GhostOverlay, LiveCaptions, DemoMode, AudioDeviceSelector
+│   │   ├── hooks/           # useGhostTakeover, useAudioRecorder
+│   │   ├── pages/           # Dashboard, Onboarding, Call, Debrief
+│   │   ├── stores/          # ghostStore, profileStore (Zustand)
+│   │   └── lib/             # api.js, utils.js
+│   └── tests/               # node:test suites for stores and API helpers
 │
 └── server/                  # Node.js backend
-    └── src/
-        ├── lib/             # stt.js, tts.js, classifier.js, posthog.js
-        └── routes/          # ghost.js, voice.js, debrief.js, engine.js
+    ├── src/
+    │   ├── app.js           # Express app (index.js starts it)
+    │   ├── lib/             # stt.js, tts.js, classifier.js, posthog.js
+    │   └── routes/          # ghost.js, voice.js, debrief.js, health.js
+    └── tests/               # node:test suites with mocked ElevenLabs/NVIDIA
 ```
 
 ---
@@ -230,8 +229,10 @@ ghost/
 | `ELEVENLABS_API_KEY` | ✅ | ElevenLabs API key for STT, TTS, voice clone |
 | `NVIDIA_API_KEY` | ✅ | NVIDIA NIM key for Llama 3.3 70B |
 | `POSTHOG_API_KEY` | Optional | PostHog project key for observability |
-| `NGROK_URL` | Optional | ngrok tunnel URL (future Speech Engine WS) |
+| `POSTHOG_HOST` | Optional | PostHog host (default: `https://us.i.posthog.com`) |
 | `PORT` | Optional | Server port (default: 3001) |
+
+Put these in `.env` at the repo root (see `.env.example`). `server/.env` is still read as a fallback.
 
 ---
 
@@ -243,7 +244,30 @@ ghost/
 | LLM classify + response | ~600ms | NVIDIA NIM Llama 3.3 70B |
 | TTS first audio chunk | ~700ms | ElevenLabs Turbo v2.5 streaming |
 | Audio routing | ~100ms | BlackHole near-zero |
-| **Total** | **~1.8s** | Pre-warm cache reduces to ~0.8s |
+| **Total** | **~1.8s** | |
+
+---
+
+## Running Tests
+
+```bash
+npm test          # server + client suites (Node's built-in test runner)
+npm run build     # production build of the client
+```
+
+The server tests mock ElevenLabs and NVIDIA, so they need no API keys or network access. CI runs both on Node 20 and 22.
+
+---
+
+## Deployment
+
+Ghost is meant to run **locally**, on the same Mac you take calls from. Deploying it to Vercel (or any public host) is not recommended:
+
+- The core trick needs local hardware: your microphone, the BlackHole virtual audio device and Chrome's `setSinkId`. A hosted copy can't reach any of these.
+- The API routes have no authentication. A public URL would let anyone spend your ElevenLabs and NVIDIA credits or clone voices on your account.
+- Voice profiles are stored in your browser's localStorage, so there is nothing to share between machines anyway.
+
+If you ever want a public demo, put it behind authentication first.
 
 ---
 
