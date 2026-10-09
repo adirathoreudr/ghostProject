@@ -89,7 +89,7 @@ export default function OnboardingPage() {
       {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 h-0.5 bg-ghost-border z-50">
         <div
-          className="h-full bg-gradient-to-r from-ghost-accent to-ghost-gold transition-all duration-500"
+          className="h-full bg-linear-to-r from-ghost-accent to-ghost-gold transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -123,7 +123,7 @@ export default function OnboardingPage() {
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
                 placeholder="e.g. Alex, Sarah, Dev Team"
-                className="w-full bg-ghost-surface border border-ghost-border rounded-xl px-4 py-3.5 text-ghost-text font-body text-base placeholder-ghost-dim focus:outline-none focus:border-ghost-accent transition-colors"
+                className="w-full bg-ghost-surface border border-ghost-border rounded-xl px-4 py-3.5 text-ghost-text font-body text-base placeholder-ghost-dim focus:outline-hidden focus:border-ghost-accent transition-colors"
               />
             </div>
 

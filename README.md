@@ -87,7 +87,7 @@ POST /api/ghost/takeover
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 + Vite + Tailwind CSS + Zustand |
+| Frontend | React 18 + Vite 8 + Tailwind CSS 4 + React Router 7 + Zustand |
 | Backend | Node.js + Express |
 | STT | ElevenLabs Scribe v2 |
 | Voice Clone | ElevenLabs Instant Voice Clone |
@@ -139,7 +139,7 @@ POST /api/ghost/takeover
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20.19+ or 22.12+
 - NVIDIA NIM API key (free) — [build.nvidia.com](https://build.nvidia.com) → any model → Get API Key
 - **Either** an ElevenLabs API key (paid) — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys)
   **or** Python 3.11 for the free local voice server (see [Free Mode](#free-mode-no-elevenlabs-credits))
