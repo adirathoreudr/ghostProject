@@ -165,12 +165,12 @@ export default function DebriefPage() {
             <h2 className="font-display font-bold text-ghost-text text-lg">Call Summary</h2>
             <div className="flex items-center gap-2">
               {summarySource === 'llm' && (
-                <span className="font-mono text-xs text-ghost-green px-2 py-0.5 rounded bg-ghost-green/10 border border-ghost-green/20">
+                <span className="font-mono text-xs text-ghost-green px-2 py-0.5 rounded-sm bg-ghost-green/10 border border-ghost-green/20">
                   AI Generated
                 </span>
               )}
               {summarySource === 'fallback' && (
-                <span className="font-mono text-xs text-ghost-gold px-2 py-0.5 rounded bg-ghost-gold/10 border border-ghost-gold/20">
+                <span className="font-mono text-xs text-ghost-gold px-2 py-0.5 rounded-sm bg-ghost-gold/10 border border-ghost-gold/20">
                   Auto Summary
                 </span>
               )}
@@ -233,7 +233,7 @@ export default function DebriefPage() {
 
                   <div className="col-span-2">
                     <span
-                      className="px-2 py-0.5 rounded font-mono text-xs font-semibold"
+                      className="px-2 py-0.5 rounded-sm font-mono text-xs font-semibold"
                       style={{ background: `${meta.color}18`, color: meta.color, border: `1px solid ${meta.color}30` }}
                     >
                       {meta.label}

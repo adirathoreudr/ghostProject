@@ -163,7 +163,7 @@ export default function CallPage() {
                 <h2 className="font-display text-3xl font-bold text-ghost-text mb-3">Ghost is standing by.</h2>
                 <p className="text-ghost-sub leading-relaxed mb-6 max-w-sm mx-auto">
                   When you hear an objection, hold{' '}
-                  <kbd className="px-2 py-0.5 rounded bg-ghost-card border border-ghost-border text-ghost-text font-mono text-sm">SPACE</kbd>.
+                  <kbd className="px-2 py-0.5 rounded-sm bg-ghost-card border border-ghost-border text-ghost-text font-mono text-sm">SPACE</kbd>.
                   {' '}Release when they finish. Ghost responds in your voice.
                 </p>
                 <div className="flex items-center justify-center gap-6 text-sm text-ghost-dim font-mono">
@@ -212,7 +212,7 @@ export default function CallPage() {
 function KeyGuide({ keys, action }) {
   return (
     <div className="flex items-center justify-between">
-      <kbd className="px-1.5 py-0.5 rounded bg-ghost-card border border-ghost-border text-ghost-sub font-mono text-xs">{keys}</kbd>
+      <kbd className="px-1.5 py-0.5 rounded-sm bg-ghost-card border border-ghost-border text-ghost-sub font-mono text-xs">{keys}</kbd>
       <span className="text-ghost-dim text-xs">{action}</span>
     </div>
   );

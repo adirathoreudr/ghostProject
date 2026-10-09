@@ -79,7 +79,7 @@ export function LiveCaptions({ tokens, finalText, objectionType, status }) {
           <div className="flex items-center gap-1.5">
             <div className="w-1 h-1 rounded-full" style={{ background: objMeta.color }} />
             <span
-              className="font-mono text-xs px-2 py-0.5 rounded"
+              className="font-mono text-xs px-2 py-0.5 rounded-sm"
               style={{ background: `${objMeta.color}18`, color: objMeta.color }}
             >
               {objMeta.label} Objection Detected

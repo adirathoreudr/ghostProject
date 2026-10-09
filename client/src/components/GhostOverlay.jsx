@@ -89,7 +89,7 @@ export function GhostOverlay({
             </span>
 
             {latencyMs && status !== 'idle' && (
-              <span className="font-mono text-xs text-ghost-dim bg-ghost-surface border border-ghost-border px-1.5 py-0.5 rounded">
+              <span className="font-mono text-xs text-ghost-dim bg-ghost-surface border border-ghost-border px-1.5 py-0.5 rounded-sm">
                 {latencyMs}ms
               </span>
             )}
@@ -246,7 +246,7 @@ export function GhostOverlay({
                   return (
                     <div key={entry.id} className="flex items-center gap-2 py-1 border-b border-ghost-border/50 last:border-0">
                       <span
-                        className="px-1.5 py-0.5 rounded font-mono text-xs shrink-0"
+                        className="px-1.5 py-0.5 rounded-sm font-mono text-xs shrink-0"
                         style={{ background: `${meta?.color}18`, color: meta?.color }}
                       >
                         {meta?.label || entry.objectionType}
@@ -329,7 +329,7 @@ function SpeakingCard({ transcript, responseText, objMeta, objectionType, confid
       <div className="flex items-center gap-2 mb-2.5">
         {objMeta && (
           <span
-            className="px-2 py-0.5 rounded font-mono text-xs font-semibold uppercase tracking-wide"
+            className="px-2 py-0.5 rounded-sm font-mono text-xs font-semibold uppercase tracking-wide"
             style={{ background: `${objMeta.color}18`, color: objMeta.color, border: `1px solid ${objMeta.color}35` }}
           >
             {objMeta.label}
@@ -376,7 +376,7 @@ function LastResult({ transcript, responseText, objMeta, objectionType, confiden
         )}
         {objMeta && (
           <span
-            className="px-1.5 py-0.5 rounded font-mono text-xs"
+            className="px-1.5 py-0.5 rounded-sm font-mono text-xs"
             style={{ background: `${objMeta.color}15`, color: objMeta.color }}
           >
             {objMeta.label}

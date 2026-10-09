@@ -1,6 +1,106 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-ghost-black: #080810;
+  --color-ghost-deep: #0d0d1a;
+  --color-ghost-surface: #12121f;
+  --color-ghost-card: #16162a;
+  --color-ghost-border: #1e1e35;
+  --color-ghost-muted: #2a2a45;
+  --color-ghost-accent: #e94560;
+  --color-ghost-accentlo: #c73550;
+  --color-ghost-gold: #f4a623;
+  --color-ghost-cyan: #00d4ff;
+  --color-ghost-green: #00ff88;
+  --color-ghost-text: #e8e8f0;
+  --color-ghost-sub: #8888aa;
+  --color-ghost-dim: #555570;
+
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'DM Sans', sans-serif;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+  --animate-slide-up: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-in: fadeIn 0.4s ease-out;
+  --animate-ping-slow: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-scan: scan 3s linear infinite;
+
+  /* v4 retuned the default palette; keep the v3 reds used by error states */
+  --color-red-300: #fca5a5;
+  --color-red-800: #991b1b;
+  --color-red-950: #450a0a;
+
+  @keyframes glow {
+    0% {
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+    }
+    100% {
+      box-shadow:
+        0 0 40px rgba(233, 69, 96, 0.7),
+        0 0 80px rgba(233, 69, 96, 0.2);
+    }
+  }
+  @keyframes slideUp {
+    0% {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes scan {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100vh);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e7eb; /* v3 gray-200 */
+  }
+
+  /* v4 preflight dropped the pointer cursor on buttons */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Must stay in the base layer: unlayered rules beat every Tailwind utility
+     in v4, so this reset would otherwise wipe out all p-* / m-* classes. */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+}
 
 /* ── Google Fonts loaded via HTML ── */
 
@@ -16,12 +116,6 @@
   --ghost-green:   #00ff88;
   --ghost-text:    #e8e8f0;
   --ghost-sub:     #8888aa;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html, body, #root {

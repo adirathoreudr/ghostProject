@@ -118,7 +118,7 @@ function DeviceOption({ label, deviceId, selected, isBlackHole, onSelect }) {
     >
       <div className="flex items-center gap-2">
         {isBlackHole && (
-          <span className="px-1.5 py-0.5 rounded text-xs font-mono bg-ghost-green/10 text-ghost-green border border-ghost-green/30">
+          <span className="px-1.5 py-0.5 rounded-sm text-xs font-mono bg-ghost-green/10 text-ghost-green border border-ghost-green/30">
             BH
           </span>
         )}
