@@ -84,7 +84,7 @@ export default function DebriefPage() {
       conversationId,
       repName: activeProfile?.name,
       persona: activeProfile?.persona,
-      callStart: new Date(callStartTime).toISOString(),
+      callStart: callStartTime ? new Date(callStartTime).toISOString() : null,
       sessionLog,
       summary,
     };
@@ -94,7 +94,8 @@ export default function DebriefPage() {
     a.href = url;
     a.download = `ghost-debrief-${conversationId?.slice(0, 8) || 'session'}.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoking synchronously can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -238,7 +239,7 @@ export default function DebriefPage() {
                       {meta.label}
                     </span>
                     <div className="text-ghost-dim/60 text-xs font-mono mt-1">
-                      {(entry.confidence * 100).toFixed(0)}%
+                      {Number.isFinite(entry.confidence) ? `${(entry.confidence * 100).toFixed(0)}%` : '—'}
                     </div>
                   </div>
 

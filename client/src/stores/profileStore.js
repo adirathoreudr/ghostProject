@@ -35,7 +35,6 @@ export const useProfileStore = create(
     (set, get) => ({
       profiles: [],        // [{ id, name, voice_id, persona, createdAt }]
       activeProfileId: null,
-      engineId: null,      // Speech Engine instance ID
 
       // ── Profile actions ───────────────────────────────────────
       addProfile: (profile) => {
@@ -82,10 +81,7 @@ export const useProfileStore = create(
 
       canAddProfile: () => get().profiles.length < MAX_PROFILES,
 
-      // ── Engine actions ────────────────────────────────────────
-      setEngineId: (engineId) => set({ engineId }),
-
-      clearAll: () => set({ profiles: [], activeProfileId: null, engineId: null }),
+      clearAll: () => set({ profiles: [], activeProfileId: null }),
     }),
     {
       name: 'ghost-profiles',
