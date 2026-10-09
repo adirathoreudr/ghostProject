@@ -25,10 +25,6 @@ export const useGhostStore = create((set, get) => ({
   conversationId: null,    // unique per call session
   callStartTime: null,
 
-  // ── Pre-warm cache ─────────────────────────────────────────────
-  prewarmCache: {},        // { objection_type: audioBlob }
-  prewarmStatus: 'idle',   // idle | loading | ready | failed
-
   // ── Actions ───────────────────────────────────────────────────
   startSession: () => set({
     conversationId: crypto.randomUUID(),
@@ -61,7 +57,6 @@ export const useGhostStore = create((set, get) => ({
   setCaptionFinal: (text) => set({ captionFinal: text }),
 
   setSpeaking: ({ transcript, objectionType, confidence, responseText, latencyMs }) => {
-    const state = useGhostStore.getState();
     const entry = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
@@ -102,9 +97,6 @@ export const useGhostStore = create((set, get) => ({
     conversationId: null,
     callStartTime: null,
   }),
-
-  setPrewarmStatus: (s) => set({ prewarmStatus: s }),
-  setPrewarmCache: (cache) => set({ prewarmCache: cache, prewarmStatus: 'ready' }),
 }));
 
 // Objection type display config

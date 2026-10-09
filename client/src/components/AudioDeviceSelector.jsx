@@ -19,10 +19,13 @@ export function AudioDeviceSelector({ onDeviceSelect }) {
 
     async function loadDevices() {
       try {
-        // Must request mic first so device labels are populated
-        await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
+        // Must request mic first so device labels are populated — then release it
+        // straight away, or the mic stays open (one more stream per devicechange).
+        const probe = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+        probe?.getTracks().forEach(t => t.stop());
         const all = await navigator.mediaDevices.enumerateDevices();
-        const outputs = all.filter(d => d.kind === 'audiooutput');
+        // Chrome also lists a "default" alias, which duplicates our Default Speaker entry.
+        const outputs = all.filter(d => d.kind === 'audiooutput' && d.deviceId !== 'default');
         setDevices(outputs);
       } catch (err) {
         console.warn('[AudioDevice] Could not enumerate devices:', err.message);

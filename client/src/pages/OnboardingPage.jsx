@@ -42,20 +42,14 @@ export default function OnboardingPage() {
     setStep(STEPS.PERMISSION);
   };
 
-  const handleRequestPermission = async () => {
-    await recorder.requestPermission();
-    if (recorder.state !== 'error') {
-      setStep(STEPS.RECORD);
-    }
-  };
+  // The effect below moves on once permission is granted. Reading recorder.state
+  // right after the await would see the stale pre-request value, so don't.
+  const handleRequestPermission = () => recorder.requestPermission();
 
-  // Permission request is async — watch state change
+  // Permission request is async — watch state change (on denial we stay here and show the error)
   React.useEffect(() => {
     if (step === STEPS.PERMISSION && recorder.state === 'ready') {
       setStep(STEPS.RECORD);
-    }
-    if (step === STEPS.PERMISSION && recorder.state === 'error') {
-      // Stay on permission step, error shown
     }
   }, [recorder.state, step]);
 

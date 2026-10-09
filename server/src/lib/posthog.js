@@ -13,10 +13,15 @@ export function getPostHog() {
       };
     }
     _posthog = new PostHog(key, {
-      host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
+      host: process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
     });
   }
   return _posthog;
+}
+
+/** Flush queued events before the process exits. */
+export async function shutdownPostHog() {
+  if (_posthog) await _posthog.shutdown();
 }
 
 export function captureEvent(distinctId, event, properties = {}) {

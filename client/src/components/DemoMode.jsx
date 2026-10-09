@@ -10,7 +10,6 @@ const STEPS = [
   { id: 'keys',     label: 'API keys configured',          check: 'ElevenLabs + NVIDIA present' },
   { id: 'mic',      label: 'Microphone accessible',        check: 'getUserMedia succeeds' },
   { id: 'tts',      label: 'TTS voice clone reachable',    check: 'Test TTS responds' },
-  { id: 'prewarm',  label: 'Pre-warm cache loaded',        check: '/api/ghost/prewarm succeeds' },
 ];
 
 export function DemoMode({ onClose }) {
@@ -79,34 +78,15 @@ export function DemoMode({ onClose }) {
     // 5. TTS voice clone test
     setCurrent('tts');
     try {
-      const url = `/api/voice/test-tts/${activeProfile.voice_id}`;
-      const res = await fetch(url);
+      const res = await fetch(api.voice.testTTS(activeProfile.voice_id));
       if (!res.ok) throw new Error(`TTS returned ${res.status}`);
       // Just check headers arrive — don't play audio
       const ct = res.headers.get('content-type') || '';
+      res.body?.cancel();
       if (!ct.includes('audio')) throw new Error('Non-audio response');
       setResult('tts', 'pass', 'Voice clone reachable');
     } catch (err) {
       setResult('tts', 'warn', `TTS check failed: ${err.message} — may still work live`);
-    }
-
-    // 6. Prewarm
-    setCurrent('prewarm');
-    try {
-      const res = await fetch('/api/ghost/prewarm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice_id: activeProfile.voice_id, persona: activeProfile.persona || 'hormozi' }),
-        signal: AbortSignal.timeout(20000),
-      });
-      const data = await res.json();
-      const ok = data.results?.filter(r => r.ok).length || 0;
-      const total = data.results?.length || 0;
-      if (ok === 0) throw new Error('All pre-warm requests failed');
-      setResult('prewarm', ok === total ? 'pass' : 'warn',
-        `${ok}/${total} responses cached — latency will be lower`);
-    } catch (err) {
-      setResult('prewarm', 'warn', `Pre-warm failed (non-blocking): ${err.message}`);
     }
 
     setCurrent(null);
@@ -140,7 +120,7 @@ export function DemoMode({ onClose }) {
         {/* Steps */}
         <div className="px-6 py-5 space-y-3">
           <p className="text-ghost-sub text-sm mb-4">
-            Verifies your setup is demo-ready. Run this before going live with judges.
+            Verifies your setup is ready. Run this before going live on a call.
           </p>
 
           {STEPS.map((step) => {
@@ -220,7 +200,7 @@ export function DemoMode({ onClose }) {
 
           {done && (
             <button
-              onClick={() => { onClose(); navigate('/call'); }}
+              onClick={() => { onClose(); if (hasFails) navigate('/call'); }}
               className={`py-3 px-5 rounded-xl border font-mono text-sm transition-all ${
                 hasFails
                   ? 'border-ghost-accent/40 text-ghost-accent hover:bg-ghost-accent/10'

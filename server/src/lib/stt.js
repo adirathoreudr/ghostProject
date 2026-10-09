@@ -15,7 +15,7 @@ function getClient() {
  *
  * SDK param names (camelCase, not snake_case):
  *   file       — the audio File object
- *   modelId    — 'scribe_v1'
+ *   modelId    — 'scribe_v2'
  *   languageCode — 'en'
  *
  * Response shape: { text, language_code, language_probability, words, ... }
@@ -35,7 +35,7 @@ export async function transcribeAudio(audioBuffer, mimeType = 'audio/webm') {
   // Note: SDK uses camelCase params internally, serializes to snake_case for the API
   const result = await client.speechToText.convert({
     file: audioFile,       // ← 'file' not 'audio'
-    modelId: 'scribe_v1', // ← camelCase, not model_id
+    modelId: 'scribe_v2', // ← camelCase, not model_id
     languageCode: 'en',   // ← camelCase, not language_code
   });
 

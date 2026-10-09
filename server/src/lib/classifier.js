@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const MODEL = 'meta/llama-3.3-70b-instruct';
 
@@ -53,11 +51,52 @@ RESPONSE RULES:
 Return ONLY valid JSON — no markdown fences, no explanation, nothing outside the JSON object:
 {"objection_type":"stall|price|authority|timing|competitor","confidence":0.0,"response":"spoken response text here"}`;
 
+export const PERSONA_IDS = Object.keys(PERSONA_PROMPTS);
+const VALID_TYPES = ['stall', 'price', 'authority', 'timing', 'competitor'];
+
+/** Map any client-supplied persona onto a known one (defaults to hormozi). */
+export function normalizePersona(persona) {
+  return PERSONA_IDS.includes(persona) ? persona : 'hormozi';
+}
+
+/**
+ * Parse the model's reply into { objection_type, confidence, response }.
+ * Tolerates markdown fences or prose around the JSON object.
+ */
+export function parseClassification(raw) {
+  const cleaned = raw.replace(/```(?:json)?\s*/gi, '').trim();
+  const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(objectMatch ? objectMatch[0] : cleaned);
+  } catch (e) {
+    console.error('[Classifier] JSON parse failed:', cleaned);
+    throw new Error(`Model returned invalid JSON: ${cleaned.slice(0, 100)}`);
+  }
+
+  if (!VALID_TYPES.includes(parsed.objection_type)) {
+    console.warn('[Classifier] Unknown type:', parsed.objection_type, '— defaulting to stall');
+    parsed.objection_type = 'stall';
+  }
+  if (!parsed.response || typeof parsed.response !== 'string') {
+    throw new Error('Model returned empty response text');
+  }
+
+  // Keep confidence a number in [0, 1] — it is sent as a header and shown as a %.
+  let confidence = Number(parsed.confidence);
+  if (!Number.isFinite(confidence)) confidence = 0.5;
+  if (confidence > 1 && confidence <= 100) confidence /= 100;
+  parsed.confidence = Math.min(1, Math.max(0, confidence));
+
+  return parsed;
+}
+
 export async function classifyObjection(transcript, persona = 'hormozi') {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) throw new Error('NVIDIA_API_KEY not set in .env');
 
-  const personaPrompt = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.hormozi;
+  const personaPrompt = PERSONA_PROMPTS[normalizePersona(persona)];
 
   console.log(`[Classifier] Classifying: "${transcript.slice(0, 80)}" | Persona: ${persona}`);
   const startMs = Date.now();
@@ -96,24 +135,7 @@ export async function classifyObjection(transcript, persona = 'hormozi') {
 
   console.log(`[Classifier] Raw response (${latencyMs}ms): ${raw}`);
 
-  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (e) {
-    console.error('[Classifier] JSON parse failed:', cleaned);
-    throw new Error(`Model returned invalid JSON: ${cleaned.slice(0, 100)}`);
-  }
-
-  const validTypes = ['stall', 'price', 'authority', 'timing', 'competitor'];
-  if (!validTypes.includes(parsed.objection_type)) {
-    console.warn('[Classifier] Unknown type:', parsed.objection_type, '— defaulting to stall');
-    parsed.objection_type = 'stall';
-  }
-  if (!parsed.response || typeof parsed.response !== 'string') {
-    throw new Error('Model returned empty response text');
-  }
+  const parsed = parseClassification(raw);
 
   console.log(`[Classifier] ✅ Type: ${parsed.objection_type} (${(parsed.confidence * 100).toFixed(0)}%) | "${parsed.response.slice(0, 60)}..."`);
 

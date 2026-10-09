@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useGhostStore } from '../stores/ghostStore.js';
+import { safeDecodeHeader, isTypingTarget } from '../lib/utils.js';
 
 const MIME_PREFERENCE = [
   'audio/webm;codecs=opus',
@@ -7,6 +8,9 @@ const MIME_PREFERENCE = [
   'audio/ogg;codecs=opus',
   'audio/mp4',
 ];
+
+// Clips shorter than this rarely contain a full objection and STT tends to reject them.
+const MIN_RECORDING_MS = 700;
 
 function getBestMime() {
   for (const m of MIME_PREFERENCE) {
@@ -27,6 +31,7 @@ export function useGhostTakeover(activeProfile) {
   const abortRef      = useRef(null);
   const mimeRef       = useRef('');
   const recordStartMs = useRef(0);
+  const captionTimers = useRef([]);
 
   const initMic = useCallback(async () => {
     if (streamRef.current) return;
@@ -44,11 +49,16 @@ export function useGhostTakeover(activeProfile) {
   }, []);
 
   const stopPlayback = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+    const audio = audioRef.current;
+    if (!audio) return;
+    // Detach handlers before clearing the source: an emptied src fires 'error',
+    // which would otherwise report "Audio playback failed" on every interruption.
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    if (audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
+    audio.removeAttribute('src');
+    audioRef.current = null;
   }, []);
 
   const cancelInFlight = useCallback(() => {
@@ -56,6 +66,11 @@ export function useGhostTakeover(activeProfile) {
       abortRef.current.abort();
       abortRef.current = null;
     }
+  }, []);
+
+  const clearCaptionTimers = useCallback(() => {
+    captionTimers.current.forEach(clearTimeout);
+    captionTimers.current = [];
   }, []);
 
   const handleSpaceDown = useCallback(async () => {
@@ -69,11 +84,14 @@ export function useGhostTakeover(activeProfile) {
     spaceHeld.current = true;
     stopPlayback();
     cancelInFlight();
+    clearCaptionTimers();
     store.setListening();
 
     if (!streamRef.current) {
       await initMic();
-      if (!streamRef.current) return;
+      if (!streamRef.current) { spaceHeld.current = false; return; }
+      // SPACE may have been released while the mic was still starting up.
+      if (!spaceHeld.current) { store.setIdle(); return; }
     }
 
     chunksRef.current = [];
@@ -92,7 +110,7 @@ export function useGhostTakeover(activeProfile) {
       store.setError(`Recording failed: ${err.message}`);
       spaceHeld.current = false;
     }
-  }, [activeProfile, initMic, stopPlayback, cancelInFlight]);
+  }, [activeProfile, initMic, stopPlayback, cancelInFlight, clearCaptionTimers]);
 
   const handleSpaceUp = useCallback(async () => {
     if (!spaceHeld.current) return;
@@ -101,24 +119,17 @@ export function useGhostTakeover(activeProfile) {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === 'inactive') { store.setIdle(); return; }
 
+    const heldMs = Date.now() - recordStartMs.current;
     await new Promise((resolve) => { recorder.onstop = resolve; recorder.stop(); });
     recorderRef.current = null;
 
     const audioBlob = new Blob(chunksRef.current, { type: mimeRef.current || 'audio/webm' });
     chunksRef.current = [];
 
-    if (audioBlob.size < 1000) {
-      console.warn('[Ghost] Audio too short:', audioBlob.size, 'bytes');
-      store.setError('Recording too short. Hold SPACE while speaking the objection.');
+    if (heldMs < MIN_RECORDING_MS || audioBlob.size < 1000) {
+      console.warn(`[Ghost] Recording too short: ${heldMs}ms, ${audioBlob.size} bytes`);
+      store.setError('Recording too short. Hold SPACE while the prospect speaks the objection.');
       return;
-    }
-
-    // Enforce minimum 700ms recording time — ElevenLabs STT rejects very short clips
-    const heldMs = Date.now() - recordStartMs.current;
-    if (heldMs < 700) {
-      const wait = 700 - heldMs;
-      console.warn(`[Ghost] Recording only ${heldMs}ms — waiting ${wait}ms more before submit`);
-      await new Promise(r => setTimeout(r, wait));
     }
 
     console.log(`[Ghost] Audio captured: ${audioBlob.size} bytes | starting pipeline`);
@@ -126,7 +137,7 @@ export function useGhostTakeover(activeProfile) {
     processingRef.current = true;
 
     try {
-      await runPipeline(audioBlob, activeProfile, store, abortRef, audioRef);
+      await runPipeline(audioBlob, activeProfile, abortRef, audioRef, captionTimers);
     } finally {
       processingRef.current = false;
     }
@@ -141,9 +152,11 @@ export function useGhostTakeover(activeProfile) {
       if (e.code === 'Escape') {
         cancelInFlight();
         stopPlayback();
+        clearCaptionTimers();
         spaceHeld.current = false;
         processingRef.current = false;
-        if (recorderRef.current?.state !== 'inactive') { recorderRef.current?.stop(); recorderRef.current = null; }
+        if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+        recorderRef.current = null;
         store.setIdle();
       }
     };
@@ -156,7 +169,7 @@ export function useGhostTakeover(activeProfile) {
       window.removeEventListener('keydown', onDown, { capture: true });
       window.removeEventListener('keyup', onUp, { capture: true });
     };
-  }, [handleSpaceDown, handleSpaceUp, cancelInFlight, stopPlayback]);
+  }, [handleSpaceDown, handleSpaceUp, cancelInFlight, stopPlayback, clearCaptionTimers]);
 
   useEffect(() => {
     if (activeProfile?.voice_id) initMic();
@@ -164,7 +177,7 @@ export function useGhostTakeover(activeProfile) {
   }, [activeProfile?.id]);
 
   useEffect(() => {
-    return () => { cancelInFlight(); stopPlayback(); };
+    return () => { cancelInFlight(); stopPlayback(); clearCaptionTimers(); };
   }, []);
 
   return {
@@ -186,7 +199,10 @@ export function useGhostTakeover(activeProfile) {
 
 // ── Pipeline ───────────────────────────────────────────────────────────────
 
-async function runPipeline(audioBlob, activeProfile, store, abortRef, audioRef) {
+async function runPipeline(audioBlob, activeProfile, abortRef, audioRef, captionTimers) {
+  // Read the store fresh: the hook's callbacks outlive renders, so a captured
+  // snapshot would still hold the conversationId from before startSession().
+  const store = useGhostStore.getState();
   const { voice_id, persona, name } = activeProfile;
   const pipelineStart = performance.now();
   const conversationId = store.conversationId || crypto.randomUUID();
@@ -199,50 +215,54 @@ async function runPipeline(audioBlob, activeProfile, store, abortRef, audioRef) 
   form.append('mime_type', audioBlob.type);
   form.append('conversation_id', conversationId);
 
-  abortRef.current = new AbortController();
+  const controller = new AbortController();
+  abortRef.current = controller;
 
   let response;
+  let audioArrayBuffer;
   try {
     response = await fetch('/api/ghost/takeover', {
       method: 'POST',
       body: form,
-      signal: abortRef.current.signal,
+      signal: controller.signal,
     });
+
+    if (!response.ok) {
+      let errData = {};
+      try { errData = await response.json(); } catch {}
+      const msg = errData.error || `Server error ${response.status}`;
+      const step = errData.step || 'unknown';
+      console.error(`[Ghost] Pipeline failed at [${step}]:`, msg);
+      store.setError(`${step.toUpperCase()} failed: ${msg}`);
+      return;
+    }
+
+    // Always use the live TTS audio from the server — responses are generated per objection.
+    audioArrayBuffer = await response.arrayBuffer();
   } catch (err) {
     if (err.name === 'AbortError') { store.setIdle(); return; }
     store.setError(`Network error: ${err.message}`);
     return;
+  } finally {
+    if (abortRef.current === controller) abortRef.current = null;
   }
-
-  if (!response.ok) {
-    let errData = {};
-    try { errData = await response.json(); } catch {}
-    const msg = errData.error || `Server error ${response.status}`;
-    const step = errData.step || 'unknown';
-    console.error(`[Ghost] Pipeline failed at [${step}]:`, msg);
-    store.setError(`${step.toUpperCase()} failed: ${msg}`);
-    return;
-  }
+  if (controller.signal.aborted) return;
 
   const transcript    = safeDecodeHeader(response.headers.get('x-ghost-transcript'));
   const objectionType = response.headers.get('x-ghost-objection-type') || 'stall';
   const confidence    = parseFloat(response.headers.get('x-ghost-confidence') || '0.8');
   const responseText  = safeDecodeHeader(response.headers.get('x-ghost-response-text'));
-  const classifyMs    = parseInt(response.headers.get('x-ghost-classify-ms') || '0');
 
   // Simulate caption token streaming for visual effect
   if (transcript) {
     const words = transcript.split(' ');
-    words.forEach((word, i) => {
-      setTimeout(() => store.addCaptionToken(word + ' ', false), i * 60);
-    });
+    captionTimers.current = words.map((word, i) =>
+      setTimeout(() => store.addCaptionToken(word + ' ', false), i * 60)
+    );
   }
 
-  // Always use the live TTS audio from the server — prewarm cache is not used
-  // for playback because the LLM generates dynamic responses each time.
-  const audioArrayBuffer = await response.arrayBuffer();
-  const audioBlob2 = new Blob([audioArrayBuffer], { type: 'audio/mpeg' });
-  const audioUrl = URL.createObjectURL(audioBlob2);
+  const audioType = response.headers.get('content-type') || 'audio/mpeg';
+  const audioUrl = URL.createObjectURL(new Blob([audioArrayBuffer], { type: audioType }));
 
   const totalMs = Math.round(performance.now() - pipelineStart);
   store.setSpeaking({ transcript, objectionType, confidence, responseText, latencyMs: totalMs });
@@ -266,18 +286,9 @@ async function runPipeline(audioBlob, activeProfile, store, abortRef, audioRef) 
   try {
     await audio.play();
   } catch (playErr) {
+    // play() also rejects when playback is interrupted on purpose (SPACE/ESC).
+    if (audioRef.current !== audio) return;
     URL.revokeObjectURL(audioUrl);
     store.setError(`Playback blocked: ${playErr.message}. Click anywhere first.`);
   }
-}
-
-function safeDecodeHeader(val) {
-  if (!val) return '';
-  try { return decodeURIComponent(val); } catch { return val; }
-}
-
-function isTypingTarget(el) {
-  if (!el) return false;
-  const tag = el.tagName?.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || el.isContentEditable;
 }

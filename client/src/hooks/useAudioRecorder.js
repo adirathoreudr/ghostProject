@@ -15,7 +15,9 @@ export function useAudioRecorder() {
   const chunks = useRef([]);
   const timerRef = useRef(null);
   const analyserRef = useRef(null);
+  const audioCtxRef = useRef(null);
   const animFrameRef = useRef(null);
+  const audioUrlRef = useRef(null);
 
   // Clean up on unmount
   useEffect(() => {
@@ -23,6 +25,17 @@ export function useAudioRecorder() {
       cleanup();
     };
   }, []);
+
+  const closeAudioContext = () => {
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
+    analyserRef.current = null;
+  };
+
+  const revokePreviewUrl = () => {
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = null;
+  };
 
   const cleanup = () => {
     clearInterval(timerRef.current);
@@ -32,7 +45,8 @@ export function useAudioRecorder() {
       stream.current = null;
     }
     mediaRecorder.current = null;
-    analyserRef.current = null;
+    closeAudioContext();
+    revokePreviewUrl();
   };
 
   const requestPermission = useCallback(async () => {
@@ -61,12 +75,15 @@ export function useAudioRecorder() {
     if (!stream.current || state !== 'ready') return;
 
     chunks.current = [];
+    revokePreviewUrl();
     setAudioBlob(null);
     setAudioUrl(null);
     setSecondsLeft(RECORD_DURATION);
 
-    // Setup analyser for volume visualization
+    // Setup analyser for volume visualization (one context per recording, closed on stop)
+    closeAudioContext();
     const ctx = new AudioContext();
+    audioCtxRef.current = ctx;
     const source = ctx.createMediaStreamSource(stream.current);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
@@ -94,11 +111,13 @@ export function useAudioRecorder() {
     recorder.onstop = () => {
       const blob = new Blob(chunks.current, { type: mimeType });
       const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
       setAudioBlob(blob);
       setAudioUrl(url);
       setState('done');
       setVolume(0);
       cancelAnimationFrame(animFrameRef.current);
+      closeAudioContext();
     };
 
     recorder.start(250); // 250ms chunks for smooth data

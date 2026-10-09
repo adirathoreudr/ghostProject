@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Square, Zap } from 'lucide-react';
+import { ArrowLeft, Square } from 'lucide-react';
 import { GhostLogo } from '../components/GhostLogo.jsx';
 import { GhostOverlay } from '../components/GhostOverlay.jsx';
 import { PersonaSelector } from '../components/PersonaSelector.jsx';
@@ -12,7 +12,7 @@ import { useGhostStore, OBJECTION_META } from '../stores/ghostStore.js';
 export default function CallPage() {
   const navigate = useNavigate();
   const { profiles, activeProfileId, updateProfile } = useProfileStore();
-  const { clearSession, startSession, setPrewarmCache, setPrewarmStatus, prewarmStatus } = useGhostStore();
+  const { clearSession, startSession } = useGhostStore();
 
   const activeProfile = profiles.find(p => p.id === activeProfileId);
 
@@ -24,9 +24,6 @@ export default function CallPage() {
 
   useEffect(() => {
     startSession();
-    if (activeProfile?.voice_id) {
-      prewarmVoice(activeProfile.voice_id, activeProfile.persona || 'hormozi', setPrewarmCache, setPrewarmStatus);
-    }
   }, []);
 
   const handleEndCall = () => {
@@ -72,19 +69,6 @@ export default function CallPage() {
             <div className="w-1.5 h-1.5 rounded-full bg-ghost-green animate-pulse" />
             <span className="font-mono text-xs text-ghost-green">LIVE SESSION</span>
           </div>
-
-          {prewarmStatus === 'loading' && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ghost-surface border border-ghost-border">
-              <Zap size={10} className="text-ghost-gold animate-pulse" />
-              <span className="font-mono text-xs text-ghost-gold">Warming up…</span>
-            </div>
-          )}
-          {prewarmStatus === 'ready' && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ghost-surface border border-ghost-border">
-              <Zap size={10} className="text-ghost-green" />
-              <span className="font-mono text-xs text-ghost-green">Cache ready</span>
-            </div>
-          )}
 
           {sessionLog.length > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ghost-surface border border-ghost-border">
@@ -232,47 +216,4 @@ function KeyGuide({ keys, action }) {
       <span className="text-ghost-dim text-xs">{action}</span>
     </div>
   );
-}
-
-// ── Prewarm — fetches base64 audio blobs and caches them client-side ────────
-async function prewarmVoice(voice_id, persona, setPrewarmCache, setPrewarmStatus) {
-  setPrewarmStatus('loading');
-  console.log('[Prewarm] Starting for voice:', voice_id);
-
-  try {
-    const res = await fetch('/api/ghost/prewarm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voice_id, persona }),
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!res.ok) { setPrewarmStatus('failed'); return; }
-
-    const data = await res.json();
-    const ok = data.results?.filter(r => r.ok).length || 0;
-    console.log(`[Prewarm] ${ok}/${data.results?.length || 0} cached`);
-
-    // Convert base64 strings → Blob objects for instant playback
-    const blobCache = {};
-    if (data.audioCache) {
-      for (const [objType, b64] of Object.entries(data.audioCache)) {
-        try {
-          const binary = atob(b64);
-          const bytes  = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          blobCache[objType] = new Blob([bytes], { type: 'audio/mpeg' });
-          console.log(`[Prewarm] Blob cached for: ${objType}`);
-        } catch (e) {
-          console.warn(`[Prewarm] Blob decode failed for ${objType}:`, e.message);
-        }
-      }
-    }
-
-    setPrewarmCache(blobCache);
-    setPrewarmStatus('ready');
-  } catch (err) {
-    console.warn('[Prewarm] Failed (non-blocking):', err.message);
-    setPrewarmStatus('failed');
-  }
 }

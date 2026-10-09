@@ -1,21 +1,24 @@
 import { Router } from 'express';
 import multer from 'multer';
-import FormData from 'form-data';
-import fetch from 'node-fetch';
+import { Readable } from 'node:stream';
 import { captureEvent } from '../lib/posthog.js';
 
 export const voiceRouter = Router();
+
+const ELEVENLABS_API = 'https://api.elevenlabs.io/v1';
 
 // Store audio in memory — no disk writes needed
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
   fileFilter: (req, file, cb) => {
-    const allowed = ['audio/webm', 'audio/wav', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/x-m4a'];
-    if (allowed.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+    if (file.mimetype.startsWith('audio/')) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported audio type: ${file.mimetype}`));
+      const err = new Error(`Unsupported audio type: ${file.mimetype}`);
+      err.status = 400;
+      err.code = 'UNSUPPORTED_AUDIO';
+      cb(err);
     }
   },
 });
@@ -46,6 +49,7 @@ voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
 
     const name = req.body.name?.trim() || 'Ghost Rep';
     const description = req.body.description?.trim() || `Voice clone for ${name} — Ghost Sales Co-Pilot`;
+    const mimeType = baseMimeType(req.file.mimetype);
 
     console.log(`[Voice Clone] Creating clone for: "${name}" | Audio size: ${req.file.size} bytes | Type: ${req.file.mimetype}`);
 
@@ -54,26 +58,24 @@ voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
     form.append('name', `Ghost — ${name}`);
     form.append('description', description);
     form.append('labels', JSON.stringify({ app: 'ghost', rep: name }));
-    form.append('files', req.file.buffer, {
-      filename: `voice_sample.${getExtension(req.file.mimetype)}`,
-      contentType: req.file.mimetype,
-    });
+    form.append(
+      'files',
+      new Blob([req.file.buffer], { type: mimeType }),
+      `voice_sample.${getExtension(mimeType)}`
+    );
 
-    const response = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+    const response = await fetch(`${ELEVENLABS_API}/voices/add`, {
       method: 'POST',
-      headers: {
-        'xi-api-key': apiKey,
-        ...form.getHeaders(),
-      },
+      headers: { 'xi-api-key': apiKey },
       body: form,
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       console.error('[Voice Clone] ElevenLabs error:', data);
       return res.status(response.status).json({
-        error: data.detail?.message || data.detail || 'ElevenLabs voice clone failed',
+        error: errorDetail(data, 'ElevenLabs voice clone failed'),
         code: 'ELEVENLABS_ERROR',
         details: data,
       });
@@ -116,7 +118,7 @@ voiceRouter.delete('/clone/:voiceId', async (req, res) => {
     }
 
     const { voiceId } = req.params;
-    const response = await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+    const response = await fetch(`${ELEVENLABS_API}/voices/${encodeURIComponent(voiceId)}`, {
       method: 'DELETE',
       headers: { 'xi-api-key': apiKey },
     });
@@ -124,8 +126,8 @@ voiceRouter.delete('/clone/:voiceId', async (req, res) => {
     if (response.ok) {
       res.json({ success: true });
     } else {
-      const data = await response.json();
-      res.status(response.status).json({ error: data.detail || 'Delete failed' });
+      const data = await response.json().catch(() => ({}));
+      res.status(response.status).json({ error: errorDetail(data, 'Delete failed') });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -144,7 +146,7 @@ voiceRouter.get('/test-tts/:voiceId', async (req, res) => {
     const { voiceId } = req.params;
     const testText = "Ghost is ready. I help people solve problems and I close deals.";
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?optimize_streaming_latency=3`, {
+    const response = await fetch(`${ELEVENLABS_API}/text-to-speech/${encodeURIComponent(voiceId)}`, {
       method: 'POST',
       headers: {
         'xi-api-key': apiKey,
@@ -163,20 +165,25 @@ voiceRouter.get('/test-tts/:voiceId', async (req, res) => {
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      return res.status(response.status).json({ error: data.detail || 'TTS failed' });
+      const data = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: errorDetail(data, 'TTS failed') });
     }
 
     res.set({
       'Content-Type': 'audio/mpeg',
       'Cache-Control': 'no-cache',
     });
-    response.body.pipe(res);
+    Readable.fromWeb(response.body).pipe(res);
 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// "audio/webm;codecs=opus" → "audio/webm"
+function baseMimeType(mimeType = '') {
+  return mimeType.split(';')[0].trim().toLowerCase();
+}
 
 function getExtension(mimeType) {
   const map = {
@@ -187,5 +194,13 @@ function getExtension(mimeType) {
     'audio/ogg': 'ogg',
     'audio/x-m4a': 'm4a',
   };
-  return map[mimeType] || 'webm';
+  return map[baseMimeType(mimeType)] || 'webm';
+}
+
+// ElevenLabs errors come back as { detail: string | { message } | [{ msg }] }.
+function errorDetail(data, fallback) {
+  const detail = data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+  return detail?.message || fallback;
 }
