@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useGhostStore } from '../stores/ghostStore.js';
 import { safeDecodeHeader, isTypingTarget } from '../lib/utils.js';
+import { toWav, audioExtension } from '../lib/audio.js';
 
 const MIME_PREFERENCE = [
   'audio/webm;codecs=opus',
@@ -199,16 +200,17 @@ export function useGhostTakeover(activeProfile) {
 
 // ── Pipeline ───────────────────────────────────────────────────────────────
 
-async function runPipeline(audioBlob, activeProfile, abortRef, audioRef, captionTimers) {
+async function runPipeline(recording, activeProfile, abortRef, audioRef, captionTimers) {
   // Read the store fresh: the hook's callbacks outlive renders, so a captured
   // snapshot would still hold the conversationId from before startSession().
   const store = useGhostStore.getState();
   const { voice_id, persona, name } = activeProfile;
   const pipelineStart = performance.now();
   const conversationId = store.conversationId || crypto.randomUUID();
+  const audioBlob = await toWav(recording, 16000); // 16 kHz mono is plenty for speech-to-text
 
   const form = new FormData();
-  form.append('audio', audioBlob, 'objection.webm');
+  form.append('audio', audioBlob, `objection.${audioExtension(audioBlob.type)}`);
   form.append('voice_id', voice_id);
   form.append('persona', persona || 'hormozi');
   form.append('profile_name', name || 'Ghost Rep');

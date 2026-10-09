@@ -1,3 +1,5 @@
+import { audioExtension } from './audio.js';
+
 const BASE = '/api';
 
 export async function request(path, options = {}) {
@@ -19,7 +21,7 @@ export const api = {
   voice: {
     clone: async (audioBlob, name) => {
       const form = new FormData();
-      form.append('audio', audioBlob, 'voice_sample.webm');
+      form.append('audio', audioBlob, `voice_sample.${audioExtension(audioBlob.type)}`);
       form.append('name', name);
       return request('/voice/clone', { method: 'POST', body: form });
     },
