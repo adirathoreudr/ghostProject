@@ -7,6 +7,7 @@ import { PersonaSelector } from '../components/PersonaSelector.jsx';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.js';
 import { useProfileStore } from '../stores/profileStore.js';
 import { api } from '../lib/api.js';
+import { toWav } from '../lib/audio.js';
 
 const STEPS = {
   NAME:       0,
@@ -64,7 +65,9 @@ export default function OnboardingPage() {
     setUploadError(null);
 
     try {
-      const result = await api.voice.clone(recorder.audioBlob, name.trim());
+      // 24 kHz WAV keeps enough detail for cloning and works with every voice provider.
+      const sample = await toWav(recorder.audioBlob, 24000);
+      const result = await api.voice.clone(sample, name.trim());
       const profile = addProfile({
         name: name.trim(),
         voice_id: result.voice_id,
@@ -73,7 +76,7 @@ export default function OnboardingPage() {
       setCreatedProfile(profile);
       setStep(STEPS.DONE);
     } catch (err) {
-      setUploadError(err.message || 'Voice clone failed. Check your ElevenLabs API key and try again.');
+      setUploadError(err.message || 'Voice clone failed. Check your voice provider setup and try again.');
       setStep(STEPS.PERSONA);
     }
   };
@@ -312,7 +315,7 @@ export default function OnboardingPage() {
             </button>
 
             <p className="text-ghost-dim text-xs text-center mt-3 font-mono">
-              Your audio is sent to ElevenLabs and deleted from our server immediately.
+              Your recording is only used to create your voice clone.
             </p>
           </div>
         )}
@@ -328,8 +331,8 @@ export default function OnboardingPage() {
               Cloning your voice…
             </h1>
             <p className="text-ghost-sub leading-relaxed">
-              ElevenLabs is building your voice model.
-              This takes about 10–20 seconds.
+              Building your voice model.
+              This usually takes a few seconds.
             </p>
             <div className="mt-8 flex justify-center gap-1.5">
               {[0, 1, 2].map(i => (

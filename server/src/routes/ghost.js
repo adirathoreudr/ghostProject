@@ -4,6 +4,7 @@ import { transcribeAudio } from '../lib/stt.js';
 import { classifyObjection, normalizePersona } from '../lib/classifier.js';
 import { streamTTS } from '../lib/tts.js';
 import { captureEvent } from '../lib/posthog.js';
+import { getVoiceProvider } from '../lib/voiceProvider.js';
 
 export const ghostRouter = Router();
 
@@ -24,7 +25,7 @@ ghostRouter.post('/takeover', upload.single('audio'), async (req, res) => {
 
   if (!req.file)  return res.status(400).json({ error: 'No audio',             code: 'NO_AUDIO' });
   if (!voice_id)  return res.status(400).json({ error: 'voice_id required',    code: 'NO_VOICE_ID' });
-  if (!process.env.ELEVENLABS_API_KEY)
+  if (getVoiceProvider() === 'elevenlabs' && !process.env.ELEVENLABS_API_KEY)
     return res.status(503).json({ error: 'ElevenLabs not configured',          code: 'ELEVENLABS_MISSING' });
   if (!process.env.NVIDIA_API_KEY)
     return res.status(503).json({ error: 'NVIDIA API key not configured',      code: 'NVIDIA_MISSING' });

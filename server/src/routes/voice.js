@@ -2,6 +2,9 @@ import { Router } from 'express';
 import multer from 'multer';
 import { Readable } from 'node:stream';
 import { captureEvent } from '../lib/posthog.js';
+import { getVoiceProvider, voiceBackend } from '../lib/voiceProvider.js';
+import { createLocalVoice, deleteLocalVoice } from '../lib/localVoice.js';
+import { synthesizeFree } from '../lib/tts.js';
 
 export const voiceRouter = Router();
 
@@ -32,14 +35,6 @@ const upload = multer({
  */
 voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
   try {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({
-        error: 'ElevenLabs API key not configured',
-        code: 'ELEVENLABS_NOT_CONFIGURED',
-      });
-    }
-
     if (!req.file) {
       return res.status(400).json({
         error: 'No audio file provided',
@@ -48,6 +43,23 @@ voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
     }
 
     const name = req.body.name?.trim() || 'Ghost Rep';
+
+    if (getVoiceProvider() === 'free') {
+      console.log(`[Voice Clone] Creating local clone for: "${name}" | ${req.file.size} bytes`);
+      const voiceId = await createLocalVoice(req.file.buffer, name);
+      console.log(`[Voice Clone] ✅ Created voice_id: ${voiceId}`);
+      captureEvent(name, 'voice_clone_created', { voice_id: voiceId, rep_name: name, provider: 'free' });
+      return res.json({ success: true, voice_id: voiceId, name });
+    }
+
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({
+        error: 'ElevenLabs API key not configured',
+        code: 'ELEVENLABS_NOT_CONFIGURED',
+      });
+    }
+
     const description = req.body.description?.trim() || `Voice clone for ${name} — Ghost Sales Co-Pilot`;
     const mimeType = baseMimeType(req.file.mimetype);
 
@@ -98,10 +110,10 @@ voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[Voice Clone] Unexpected error:', err);
-    res.status(500).json({
+    console.error('[Voice Clone] Error:', err.message);
+    res.status(err.status || 500).json({
       error: err.message,
-      code: 'SERVER_ERROR',
+      code: err.code || 'SERVER_ERROR',
     });
   }
 });
@@ -112,12 +124,19 @@ voiceRouter.post('/clone', upload.single('audio'), async (req, res) => {
  */
 voiceRouter.delete('/clone/:voiceId', async (req, res) => {
   try {
+    const { voiceId } = req.params;
+    const backend = voiceBackend(voiceId);
+    if (backend === 'nvidia') return res.json({ success: true }); // stock voice, nothing to delete
+    if (backend === 'local') {
+      await deleteLocalVoice(voiceId);
+      return res.json({ success: true });
+    }
+
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: 'ElevenLabs not configured' });
     }
 
-    const { voiceId } = req.params;
     const response = await fetch(`${ELEVENLABS_API}/voices/${encodeURIComponent(voiceId)}`, {
       method: 'DELETE',
       headers: { 'xi-api-key': apiKey },
@@ -130,7 +149,7 @@ voiceRouter.delete('/clone/:voiceId', async (req, res) => {
       res.status(response.status).json({ error: errorDetail(data, 'Delete failed') });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message, code: err.code });
   }
 });
 
@@ -138,13 +157,19 @@ voiceRouter.delete('/clone/:voiceId', async (req, res) => {
  * GET /api/voice/test-tts/:voiceId
  * Quick TTS test to verify a cloned voice sounds right
  */
+const TEST_TEXT = "Ghost is ready. I help people solve problems and I close deals.";
+
 voiceRouter.get('/test-tts/:voiceId', async (req, res) => {
   try {
+    const { voiceId } = req.params;
+    if (voiceBackend(voiceId) !== 'elevenlabs') {
+      const { audio } = await synthesizeFree(TEST_TEXT, voiceId);
+      res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-cache' });
+      return res.end(audio);
+    }
+
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured' });
-
-    const { voiceId } = req.params;
-    const testText = "Ghost is ready. I help people solve problems and I close deals.";
 
     const response = await fetch(`${ELEVENLABS_API}/text-to-speech/${encodeURIComponent(voiceId)}`, {
       method: 'POST',
@@ -153,7 +178,7 @@ voiceRouter.get('/test-tts/:voiceId', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: testText,
+        text: TEST_TEXT,
         model_id: 'eleven_turbo_v2_5',
         voice_settings: {
           stability: 0.5,
@@ -176,7 +201,7 @@ voiceRouter.get('/test-tts/:voiceId', async (req, res) => {
     Readable.fromWeb(response.body).pipe(res);
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message, code: err.code });
   }
 });
 

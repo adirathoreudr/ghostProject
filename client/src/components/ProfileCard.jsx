@@ -24,11 +24,11 @@ export function ProfileCard({ profile, isActive, onActivate, onDelete }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete profile "${profile.name}"? This removes the voice clone from ElevenLabs.`)) return;
+    if (!window.confirm(`Delete profile "${profile.name}"? This also deletes its voice clone.`)) return;
     try {
       await api.voice.deleteClone(profile.voice_id);
     } catch (err) {
-      console.warn('ElevenLabs delete failed (may already be gone):', err.message);
+      console.warn('Voice clone delete failed (may already be gone):', err.message);
     }
     onDelete(profile.id);
   };

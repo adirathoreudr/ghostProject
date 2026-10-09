@@ -7,7 +7,7 @@ import { api } from '../lib/api.js';
 const STEPS = [
   { id: 'profile',  label: 'Active voice profile',        check: 'Has voice_id set' },
   { id: 'server',   label: 'Server health',                check: 'GET /api/health returns ok' },
-  { id: 'keys',     label: 'API keys configured',          check: 'ElevenLabs + NVIDIA present' },
+  { id: 'keys',     label: 'Voice provider ready',         check: 'Keys (and local voice server) present' },
   { id: 'mic',      label: 'Microphone accessible',        check: 'getUserMedia succeeds' },
   { id: 'tts',      label: 'TTS voice clone reachable',    check: 'Test TTS responds' },
 ];
@@ -54,11 +54,16 @@ export function DemoMode({ onClose }) {
     setCurrent('keys');
     try {
       const h = await fetch('/api/health').then(r => r.json());
+      const free = h.env?.voice_provider === 'free';
       const missing = [];
-      if (!h.env?.elevenlabs) missing.push('ELEVENLABS_API_KEY');
-      if (!h.env?.nvidia)     missing.push('NVIDIA_API_KEY');
+      if (!free && !h.env?.elevenlabs) missing.push('ELEVENLABS_API_KEY');
+      if (!h.env?.nvidia)              missing.push('NVIDIA_API_KEY');
       if (missing.length) throw new Error(missing.join(', ') + ' missing');
-      setResult('keys', 'pass', 'ElevenLabs + NVIDIA configured');
+      if (free && !h.env?.voice_server) {
+        setResult('keys', 'warn', 'Free mode: local voice server not running — replies use the NVIDIA stock voice (npm run voice:start)');
+      } else {
+        setResult('keys', 'pass', free ? 'Free mode: NVIDIA + local voice server' : 'ElevenLabs + NVIDIA configured');
+      }
     } catch (err) {
       setResult('keys', 'fail', err.message);
       setRunning(false); return;
