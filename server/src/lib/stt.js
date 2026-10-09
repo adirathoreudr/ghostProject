@@ -1,4 +1,6 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+import { getVoiceProvider } from './voiceProvider.js';
+import { rivaTranscribe } from './riva.js';
 
 let _client = null;
 
@@ -11,6 +13,31 @@ function getClient() {
 }
 
 /**
+ * Transcribe an audio buffer with the configured provider:
+ * NVIDIA Riva (free mode, needs WAV) or ElevenLabs Scribe.
+ */
+export async function transcribeAudio(audioBuffer, mimeType = 'audio/webm') {
+  if (getVoiceProvider() !== 'free') return transcribeWithElevenLabs(audioBuffer, mimeType);
+
+  console.log(`[STT] Transcribing ${audioBuffer.length} bytes with NVIDIA Riva`);
+  const startMs = Date.now();
+  let transcript;
+  try {
+    transcript = await rivaTranscribe(audioBuffer);
+  } catch (err) {
+    if (/WAV/.test(err.message)) {
+      throw new Error(`Free mode needs WAV audio (${err.message}). Reload the page and try again.`);
+    }
+    throw err;
+  }
+  console.log(`[STT] ✅ Transcript (${Date.now() - startMs}ms): "${transcript}"`);
+  if (!transcript) {
+    throw new Error('STT returned empty transcript — audio may be too short or silent');
+  }
+  return transcript;
+}
+
+/**
  * Transcribe an audio buffer using ElevenLabs Speech-to-Text REST API.
  *
  * SDK param names (camelCase, not snake_case):
@@ -20,7 +47,7 @@ function getClient() {
  *
  * Response shape: { text, language_code, language_probability, words, ... }
  */
-export async function transcribeAudio(audioBuffer, mimeType = 'audio/webm') {
+async function transcribeWithElevenLabs(audioBuffer, mimeType) {
   const client = getClient();
 
   console.log(`[STT] Transcribing ${audioBuffer.length} bytes | type: ${mimeType}`);

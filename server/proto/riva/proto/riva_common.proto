@@ -1,0 +1,14 @@
+// SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: MIT
+//
+// Riva gRPC API definitions, regenerated from the descriptors shipped in the
+// nvidia-riva-client 2.27.0 Python package (https://pypi.org/project/nvidia-riva-client/).
+// Comments from the upstream .proto files are not included.
+
+syntax = "proto3";
+
+package nvidia.riva;
+
+message RequestId {
+  string value = 1;
+}

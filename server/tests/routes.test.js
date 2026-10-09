@@ -20,7 +20,7 @@ test('GET /api/health reports configured keys', async () => {
   const res = await fetch(`${app.url}/api/health`);
   const data = await res.json();
   assert.equal(data.status, 'ok');
-  assert.deepEqual(data.env, { elevenlabs: true, nvidia: true, posthog: false });
+  assert.deepEqual(data.env, { voice_provider: 'elevenlabs', elevenlabs: true, nvidia: true, posthog: false });
 });
 
 test('removed hackathon endpoints are gone', async () => {
