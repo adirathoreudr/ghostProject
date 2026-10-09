@@ -10,9 +10,13 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
+    "dev:free": "concurrently \"npm run voice:start\" \"VOICE_PROVIDER=free npm run dev:server\" \"npm run dev:client\"",
+    "voice:setup": "cd voice-server && ${PYTHON:-python3.11} -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt",
+    "voice:start": "cd voice-server && .venv/bin/python server.py",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
     "build": "cd client && npm run build",
-    "test": "npm --prefix server test && npm --prefix client test"
+    "test": "npm --prefix server test && npm --prefix client test",
+    "test:voice": "cd voice-server && .venv/bin/python -m pytest -q"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

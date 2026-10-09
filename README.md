@@ -95,6 +95,8 @@ POST /api/ghost/takeover
 | LLM | NVIDIA NIM — Llama 3.3 70B Instruct |
 | Audio Routing | BlackHole 2ch (M1/M2 Mac) |
 | Observability | PostHog LLM events |
+| Free mode STT | NVIDIA Riva — Parakeet CTC 1.1B (hosted, same NVIDIA key) |
+| Free mode voice clone + TTS | [Chatterbox](https://github.com/resemble-ai/chatterbox) (MIT), run locally by `voice-server/` |
 
 ---
 
@@ -138,8 +140,9 @@ POST /api/ghost/takeover
 ### Prerequisites
 
 - Node.js 20+
-- ElevenLabs API key — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys)
-- NVIDIA NIM API key — [build.nvidia.com](https://build.nvidia.com) → any model → Get API Key
+- NVIDIA NIM API key (free) — [build.nvidia.com](https://build.nvidia.com) → any model → Get API Key
+- **Either** an ElevenLabs API key (paid) — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys)
+  **or** Python 3.11 for the free local voice server (see [Free Mode](#free-mode-no-elevenlabs-credits))
 - BlackHole 2ch (M1/M2 Mac) — `brew install blackhole-2ch`
 - Chrome browser (required for `setSinkId` audio routing)
 
@@ -160,8 +163,8 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-ELEVENLABS_API_KEY=your_elevenlabs_key
 NVIDIA_API_KEY=nvapi-your_nvidia_key
+ELEVENLABS_API_KEY=your_elevenlabs_key  # leave empty to use free mode
 POSTHOG_API_KEY=your_posthog_key        # optional
 ```
 
@@ -171,6 +174,31 @@ npm run dev
 ```
 
 Open `http://localhost:5173`
+
+### Free Mode (no ElevenLabs credits)
+
+Free mode swaps every ElevenLabs call for free alternatives, so the only key you need is the free NVIDIA one:
+
+| Step | Free mode |
+|---|---|
+| Speech-to-text | NVIDIA Riva **Parakeet** on build.nvidia.com's free hosted endpoint |
+| Voice clone + TTS | **Chatterbox** by Resemble AI (MIT licence, about 24k GitHub stars), running on your own Mac |
+| Fallback voice | NVIDIA **Magpie TTS** stock voice, used if the local voice server is down |
+
+```bash
+# One-time: create the Python environment (needs Python 3.10–3.13; uses python3.11 by default)
+brew install python@3.11          # if you don't have it
+npm run voice:setup               # or: PYTHON=python3.12 npm run voice:setup
+
+# Every time: voice server + Ghost server + client, with VOICE_PROVIDER=free
+npm run dev:free
+```
+
+The first start downloads the Chatterbox Turbo weights (about 1–2 GB) from Hugging Face. On Apple Silicon the model runs on the GPU (MPS); it also works on NVIDIA GPUs and, more slowly, on CPU. Then create a profile as usual: your 30-second recording becomes the reference for your cloned voice. It stays on your machine in `voice-server/voices/`, which is git-ignored.
+
+Free mode is chosen automatically when `ELEVENLABS_API_KEY` is empty. You can also force either mode with `VOICE_PROVIDER=free` or `VOICE_PROVIDER=elevenlabs`. Profiles remember which backend made them (`local:…` voices are Chatterbox, others are ElevenLabs), so you can switch back and forth. More details are in [`voice-server/README.md`](voice-server/README.md).
+
+> Notes: Chatterbox adds Resemble AI's inaudible Perth watermark to generated audio. NVIDIA's hosted endpoints are a free trial governed by NVIDIA's API trial terms, and the function IDs can be overridden in `.env` if NVIDIA changes them.
 
 ### Audio Routing Setup (M2 Mac)
 
@@ -212,12 +240,17 @@ ghost/
 │   │   └── lib/             # api.js, utils.js
 │   └── tests/               # node:test suites for stores and API helpers
 │
-└── server/                  # Node.js backend
-    ├── src/
-    │   ├── app.js           # Express app (index.js starts it)
-    │   ├── lib/             # stt.js, tts.js, classifier.js, posthog.js
-    │   └── routes/          # ghost.js, voice.js, debrief.js, health.js
-    └── tests/               # node:test suites with mocked ElevenLabs/NVIDIA
+├── server/                  # Node.js backend
+│   ├── proto/               # NVIDIA Riva gRPC definitions (MIT)
+│   ├── src/
+│   │   ├── app.js           # Express app (index.js starts it)
+│   │   ├── lib/             # stt, tts, classifier, riva, localVoice, voiceProvider, wav, posthog
+│   │   └── routes/          # ghost.js, voice.js, debrief.js, health.js
+│   └── tests/               # node:test suites with mocked ElevenLabs/NVIDIA and a fake Riva server
+│
+└── voice-server/            # Free local voice cloning (Python + Chatterbox)
+    ├── server.py
+    └── tests/               # pytest, runs without the model
 ```
 
 ---
@@ -226,8 +259,13 @@ ghost/
 
 | Variable | Required | Description |
 |---|---|---|
-| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs API key for STT, TTS, voice clone |
-| `NVIDIA_API_KEY` | ✅ | NVIDIA NIM key for Llama 3.3 70B |
+| `NVIDIA_API_KEY` | ✅ | NVIDIA NIM key for Llama 3.3 70B (and Riva speech in free mode) |
+| `ELEVENLABS_API_KEY` | ElevenLabs mode | ElevenLabs API key for STT, TTS, voice clone |
+| `VOICE_PROVIDER` | Optional | `free` or `elevenlabs` (default: `elevenlabs` if its key is set, otherwise `free`) |
+| `VOICE_SERVER_URL` | Optional | Local voice server URL (default: `http://127.0.0.1:8005`) |
+| `NVIDIA_RIVA_ENDPOINT` | Optional | Riva gRPC endpoint (default: `grpc.nvcf.nvidia.com:443`; set `localhost:50051` for a self-hosted Riva/NIM) |
+| `NVIDIA_ASR_FUNCTION_ID` / `NVIDIA_TTS_FUNCTION_ID` | Optional | Override the hosted model function IDs |
+| `NVIDIA_TTS_VOICE` | Optional | Fallback stock voice (default: `Magpie-Multilingual.EN-US.Aria`) |
 | `POSTHOG_API_KEY` | Optional | PostHog project key for observability |
 | `POSTHOG_HOST` | Optional | PostHog host (default: `https://us.i.posthog.com`) |
 | `PORT` | Optional | Server port (default: 3001) |
@@ -253,9 +291,10 @@ Put these in `.env` at the repo root (see `.env.example`). `server/.env` is stil
 ```bash
 npm test          # server + client suites (Node's built-in test runner)
 npm run build     # production build of the client
+npm run test:voice  # voice server (after npm run voice:setup)
 ```
 
-The server tests mock ElevenLabs and NVIDIA, so they need no API keys or network access. CI runs both on Node 20 and 22.
+The server tests mock ElevenLabs and NVIDIA (including a fake Riva gRPC server), so they need no API keys or network access. The voice server tests swap the model for a tone generator. CI runs the Node suites on Node 20 and 22 and the voice server suite on Python 3.11.
 
 ---
 
@@ -266,6 +305,7 @@ Ghost is meant to run **locally**, on the same Mac you take calls from. Deployin
 - The core trick needs local hardware: your microphone, the BlackHole virtual audio device and Chrome's `setSinkId`. A hosted copy can't reach any of these.
 - The API routes have no authentication. A public URL would let anyone spend your ElevenLabs and NVIDIA credits or clone voices on your account.
 - Voice profiles are stored in your browser's localStorage, so there is nothing to share between machines anyway.
+- Free mode's voice cloning needs a GPU (or Apple MPS) and a multi-GB model, which serverless platforms can't run.
 
 If you ever want a public demo, put it behind authentication first.
 
