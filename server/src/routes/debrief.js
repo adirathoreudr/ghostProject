@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import fetch from 'node-fetch';
 import { captureEvent } from '../lib/posthog.js';
 
 export const debriefRouter = Router();
@@ -15,6 +14,9 @@ const MODEL = 'meta/llama-3.3-70b-instruct';
 debriefRouter.post('/summary', async (req, res) => {
   const { sessionLog = [], repName = 'Rep', conversationId, persona } = req.body;
 
+  if (!Array.isArray(sessionLog)) {
+    return res.status(400).json({ error: 'sessionLog must be an array', code: 'BAD_SESSION_LOG' });
+  }
   if (!sessionLog.length) {
     return res.json({ summary: ['No objections were handled this session.', '', ''] });
   }
@@ -25,7 +27,7 @@ debriefRouter.post('/summary', async (req, res) => {
     persona,
     objections_handled: sessionLog.length,
     objection_types: sessionLog.map(e => e.objectionType),
-    avg_latency_ms: Math.round(sessionLog.reduce((s, e) => s + e.latencyMs, 0) / sessionLog.length),
+    avg_latency_ms: averageLatency(sessionLog),
   });
 
   // ── Log each objection to PostHog ─────────────────────────────
@@ -88,13 +90,7 @@ Be concise, direct, and sales-specific. No fluff. Each bullet max 25 words.`;
 
     const data = await llmRes.json();
     const text = data.choices?.[0]?.message?.content?.trim() || '';
-    const bullets = text
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.startsWith('•') || l.match(/^\d\./))
-      .map(l => l.replace(/^[•\d.]\s*/, '').trim())
-      .filter(Boolean)
-      .slice(0, 3);
+    const bullets = parseBullets(text);
 
     if (bullets.length < 2) throw new Error('Not enough bullets in response');
 
@@ -107,17 +103,33 @@ Be concise, direct, and sales-specific. No fluff. Each bullet max 25 words.`;
   }
 });
 
-function buildFallbackSummary(sessionLog) {
+// Bullet markers the model may use: "•", "-", "*", "1." or "1)".
+const BULLET_PREFIX = /^(?:•\s*|[-*]\s+|\d+[.)]\s*)/;
+
+export function parseBullets(text) {
+  return text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => BULLET_PREFIX.test(l))
+    .map(l => l.replace(BULLET_PREFIX, '').replace(/\*\*/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function averageLatency(sessionLog) {
+  const values = sessionLog.map(e => Number(e.latencyMs)).filter(Number.isFinite);
+  return values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0;
+}
+
+export function buildFallbackSummary(sessionLog) {
   const types = [...new Set(sessionLog.map(e => e.objectionType))];
-  const avgMs = Math.round(sessionLog.reduce((s, e) => s + e.latencyMs, 0) / sessionLog.length);
-  const topType = sessionLog.sort((a, b) =>
-    sessionLog.filter(x => x.objectionType === b.objectionType).length -
-    sessionLog.filter(x => x.objectionType === a.objectionType).length
-  )[0]?.objectionType || 'stall';
+  const counts = {};
+  for (const e of sessionLog) counts[e.objectionType] = (counts[e.objectionType] || 0) + 1;
+  const topType = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'stall';
 
   return [
     `Ghost handled ${sessionLog.length} objection${sessionLog.length !== 1 ? 's' : ''} across types: ${types.join(', ')}.`,
     `Most frequent objection type was "${topType}" — review Ghost's response framing for this pattern.`,
-    `Average response latency was ${avgMs}ms. Practice holding SPACE earlier to capture full objections.`,
+    `Average response latency was ${averageLatency(sessionLog)}ms. Practice holding SPACE earlier to capture full objections.`,
   ];
 }

@@ -10,6 +10,19 @@ function getClient() {
   return _client;
 }
 
+// SDK v2 expects camelCase request fields and silently strips unknown keys,
+// so snake_case options would fall back to the (slower, pricier) default model.
+const TTS_OPTIONS = {
+  modelId: 'eleven_turbo_v2_5',
+  outputFormat: 'mp3_44100_128',
+  voiceSettings: {
+    stability: 0.45,
+    similarityBoost: 0.88,
+    style: 0.15,
+    useSpeakerBoost: true,
+  },
+};
+
 /**
  * Stream TTS audio for a given text and voice_id.
  * Pipes the audio stream directly into an Express response.
@@ -24,24 +37,14 @@ export async function streamTTS(text, voiceId, res) {
   console.log(`[TTS] Streaming for voice_id: ${voiceId} | Text: "${text.slice(0, 60)}..."`);
   const startMs = Date.now();
 
+  const audioStream = await client.textToSpeech.stream(voiceId, { text, ...TTS_OPTIONS });
+
+  // Set audio headers only once the upstream stream is open, so a failed
+  // request above can still be answered with a JSON error.
   res.set({
     'Content-Type': 'audio/mpeg',
-    'Transfer-Encoding': 'chunked',
     'Cache-Control': 'no-cache, no-store',
     'X-Accel-Buffering': 'no',
-  });
-
-  const audioStream = await client.textToSpeech.stream(voiceId, {
-    text,
-    model_id: 'eleven_turbo_v2_5',
-    voice_settings: {
-      stability: 0.45,
-      similarity_boost: 0.88,
-      style: 0.15,
-      use_speaker_boost: true,
-    },
-    output_format: 'mp3_44100_128',
-    optimize_streaming_latency: 3, // max latency optimization
   });
 
   let firstChunk = true;
@@ -55,33 +58,4 @@ export async function streamTTS(text, voiceId, res) {
 
   res.end();
   console.log(`[TTS] ✅ Complete in ${Date.now() - startMs}ms`);
-}
-
-/**
- * Convert text to a full audio buffer (for pre-warming).
- * @param {string} text
- * @param {string} voiceId
- * @returns {Promise<Buffer>}
- */
-export async function bufferTTS(text, voiceId) {
-  const client = getClient();
-
-  const audioStream = await client.textToSpeech.stream(voiceId, {
-    text,
-    model_id: 'eleven_turbo_v2_5',
-    voice_settings: {
-      stability: 0.45,
-      similarity_boost: 0.88,
-      style: 0.15,
-      use_speaker_boost: true,
-    },
-    output_format: 'mp3_44100_128',
-    optimize_streaming_latency: 3,
-  });
-
-  const chunks = [];
-  for await (const chunk of audioStream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
 }

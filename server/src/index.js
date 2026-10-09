@@ -1,45 +1,35 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import { voiceRouter } from './routes/voice.js';
-import { engineRouter } from './routes/engine.js';
-import { healthRouter } from './routes/health.js';
-import { ghostRouter } from './routes/ghost.js';
-import { debriefRouter } from './routes/debrief.js';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { createApp } from './app.js';
 import { validateEnv } from './lib/env.js';
+import { shutdownPostHog } from './lib/posthog.js';
+
+// .env lives at the repo root (see README); server/.env still works as a fallback.
+loadEnv({
+  path: [
+    fileURLToPath(new URL('../../.env', import.meta.url)),
+    fileURLToPath(new URL('../.env', import.meta.url)),
+  ],
+});
 
 validateEnv();
 
-const app = express(); // Initialize Express application
 const PORT = process.env.PORT || 3001;
+const app = createApp();
 
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173'],
-  credentials: true,
-}));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
-
-app.use('/api/health',  healthRouter);
-app.use('/api/voice',   voiceRouter);
-app.use('/api/engine',  engineRouter);
-app.use('/api/ghost',   ghostRouter);
-app.use('/api/debrief', debriefRouter);
-
-app.use((err, req, res, next) => {
-  console.error('[Ghost Server Error]', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    code: err.code || 'UNKNOWN_ERROR',
-  });
-});
-
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🎙️  Ghost Server running on http://localhost:${PORT}`);
-  console.log(`📡 Ngrok URL: ${process.env.NGROK_URL || 'NOT SET'}`);
   console.log(`🔑 ElevenLabs: ${process.env.ELEVENLABS_API_KEY ? '✅ configured' : '❌ MISSING'}`);
   console.log(`🤖 NVIDIA LLM: ${process.env.NVIDIA_API_KEY     ? '✅ configured' : '❌ MISSING'}`);
   console.log(`📊 PostHog:    ${process.env.POSTHOG_API_KEY    ? '✅ configured' : '❌ MISSING'}\n`);
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, async () => {
+    server.close();
+    await shutdownPostHog().catch(() => {});
+    process.exit(0);
+  });
+}
 
 export default app;

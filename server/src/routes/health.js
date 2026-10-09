@@ -11,7 +11,6 @@ healthRouter.get('/', (req, res) => {
       elevenlabs: !!process.env.ELEVENLABS_API_KEY,
       nvidia: !!process.env.NVIDIA_API_KEY,
       posthog: !!process.env.POSTHOG_API_KEY,
-      ngrok: process.env.NGROK_URL || null,
     },
   });
 });
